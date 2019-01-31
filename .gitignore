@@ -1,0 +1,11 @@
+*
+!*/
+!.gitignore
+!LICENSE
+!requirements.txt
+!*.md
+!*.gitkeep
+!*.py
+!*.sh
+!*.h
+!*.cpp
