@@ -7,10 +7,27 @@ This repository contains the demo code (as a python package) for the paper:
 "Probabilistic Discriminative Learning with Layered Graphical Models" by
 Yuesong Shen, Tao Wu, Csaba Domokos and Daniel Cremers
 
-(TODO: arxiv link and bibtex)
+Link: [arXiv:1902.00057](https://arxiv.org/abs/1902.00057) [cs.LG]
 
 If you find this code useful for your research, please consider citing the
 above paper.
+
+Bibtex:
+```
+@ARTICLE{2019arXiv190200057S,
+       author = {{Shen}, Yuesong and {Wu}, Tao and {Domokos}, Csaba and {Cremers}, Daniel},
+        title = "{Probabilistic Discriminative Learning with Layered Graphical Models}",
+      journal = {arXiv e-prints},
+     keywords = {Computer Science - Machine Learning, Statistics - Machine Learning},
+         year = 2019,
+        month = Jan,
+          eid = {arXiv:1902.00057},
+        pages = {arXiv:1902.00057},
+archivePrefix = {arXiv},
+       eprint = {1902.00057},
+ primaryClass = {cs.LG}
+}
+```
 
 The code is released under GPL v3 or later. For any questions please contact:
 yuesong.shen@tum.de
