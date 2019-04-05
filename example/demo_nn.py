@@ -40,7 +40,7 @@ import torch.nn.functional as nnf
 from lgm.utils.common import (get_timestamp, Log, check_cuda, mkdirp,
                               display_param_stats, rm, EarlyStopper,
                               Conv2dLocal)
-from lgm.utils.data.mnist import get_MNIST_dataloaders
+from lgm.utils.data.mnist import get_MNIST_dataloaders, AVAILABLE_FLAVORS
 from lgm.utils.train import train_epoch, eval_epoch, test
 
 
@@ -50,28 +50,41 @@ LYR_DIM_0 = 28
 LYR_DIM_1 = 13
 
 
-class MLP(nn.Module):
-    def __init__(self, layers: List[int], nlf: Callable[[Tensor], Tensor]
-                 ) -> None:
-        super(MLP, self).__init__()
-        self.layers = [IN_SIZE] + layers
-        self.nlf = nlf
-        self.fcs = nn.ModuleList()
-        for i in range(len(self.layers)-1):
-            self.fcs.append(nn.Linear(self.layers[i], self.layers[i+1]))
-        self.fc_out = nn.Linear(self.layers[-1], OUT_SIZE)
+class Dense(nn.Module):
+    hidden_size = 100
 
-    def forward(self, x: List[Tensor]) -> Tensor:
-        for i in range(len(self.layers) - 1):
-            x = self.nlf(self.fcs[i](x))
-        return nnf.log_softmax(self.fc_out(x), -1)
-
-
-class LocalMininet(nn.Module):
     def __init__(self, nlf: Callable[[Tensor], Tensor]) -> None:
         super().__init__()
         self.nlf = nlf
-        self.layers = None  # hacky way of saying it is LocalMininet
+        self.fcs = nn.ModuleList()
+        self.fc_hid = nn.Linear(IN_SIZE, Dense.hidden_size)
+        self.fc_out = nn.Linear(Dense.hidden_size, OUT_SIZE)
+
+    def forward(self, x: List[Tensor]) -> Tensor:
+        return nnf.log_softmax(self.fc_out(self.nlf(self.fc_hid(x))), -1)
+
+
+class Conv(nn.Module):
+    def __init__(self, nlf: Callable[[Tensor], Tensor]) -> None:
+        super().__init__()
+        self.nlf = nlf
+        self.conv_c1 = nn.Conv2d(1, 6, (5, 5), stride=(2, 2), padding=(1, 1))
+        self.conv_c2 = nn.Conv2d(6, 16, (5, 5), stride=(2, 2))
+        self.fc_h = nn.Linear(400, 100)
+        self.fc_out = nn.Linear(100, OUT_SIZE)
+
+    def forward(self, x: List[Tensor]) -> Tensor:
+        x = self.nlf(self.conv_c1(x))
+        x = self.nlf(self.conv_c2(x))
+        x = x.view(x.size(0), -1)
+        x = self.nlf(self.fc_h(x))
+        return nnf.log_softmax(self.fc_out(x), -1)
+
+
+class Local(nn.Module):
+    def __init__(self, nlf: Callable[[Tensor], Tensor]) -> None:
+        super().__init__()
+        self.nlf = nlf
         self.local_l1 = Conv2dLocal(
             LYR_DIM_0, LYR_DIM_0, 1, 6, (5, 5), stride=(2, 2), padding=(1, 1))
         self.local_l2 = Conv2dLocal(
@@ -89,13 +102,10 @@ class LocalMininet(nn.Module):
 
 def training_backup(model: nn.Module, optimizer: optim.Optimizer, path: str,
                     optim_kwargs=None) -> None:
-    layers = model.layers
     if optim_kwargs is None:
         optim_kwargs = {}
-    if not isinstance(layers, bool):
-        layers = layers[1:]
     dic = {'state_dict': model.state_dict(),
-           'layers': layers,
+           'type': model.__class__.__name__,
            'nlf': model.nlf,
            'optim_type': optimizer.__class__.__name__,
            'optim_state_dict': optimizer.state_dict(),
@@ -107,11 +117,8 @@ def training_resume(path: str, use_cuda: bool
                     ) -> Tuple[nn.Module, optim.Optimizer]:
     dic = torch.load(path)
     nlf = dic['nlf']
-    layers = dic['layers']
-    if layers is None:
-        model = LocalMininet[layers](nlf)
-    else:
-        model = MLP(layers, nlf)
+    model_type = dic['type']
+    model = globals()[model_type](nlf)
     model.load_state_dict(dic['state_dict'])
     if use_cuda:
         model.cuda()
@@ -126,15 +133,15 @@ def training_resume(path: str, use_cuda: bool
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--model',
-                        choices=('dense', 'local'),
-                        default='local',
+                        choices=('dense', 'conv', 'local'),
+                        default='conv',
                         help='Specify the NN model to run. Can be either dense'
-                             ' or local. By default local.')
+                             ', conv or local. By default conv.')
     parser.add_argument('-d', '--dataset',
-                        choices=('MNIST', 'FashionMNIST'),
+                        choices=('MNIST', 'KMNIST', 'FashionMNIST'),
                         default='MNIST',
                         help='Specify the dataset to run. Can be either MNIST '
-                             'or FashionMNIST. By default MNIST.')
+                             ', KMNIST or FashionMNIST. By default MNIST.')
     parser.add_argument('-a', '--activation',
                         choices=('relu', 'sigmoid'),
                         default='sigmoid',
@@ -172,8 +179,7 @@ if __name__ == '__main__':
     epochs = args.epoch  # int or None: set to None to enjoy early stopping
     patience = args.patience
 
-    hidden_layers = {'dense': [100],
-                     'local': None}[args.model]  # int list: MLP / None: local
+    model_type = args.model
     activ_func = torch.__dict__[args.activation]  # torch.relu / torch.sigmoid
     dataset_flavor = args.dataset  # 'MNIST' / 'FashionMNIST'
 
@@ -186,6 +192,7 @@ if __name__ == '__main__':
     test_batch = args.batch
 
     data_dir = {'MNIST': 'data/MNIST/',
+                'KMNIST': 'data/KMNIST/',
                 'FashionMNIST': 'data/FashionMNIST/'}[dataset_flavor]
     base_dir = __file__[:-3] + '/'
     save_dir = base_dir + 'model/'
@@ -205,8 +212,7 @@ if __name__ == '__main__':
     # start logger
 
     log_file = '{0}_{1}_{2}_{3}.log'.format(
-        "LocalMininet" if hidden_layers is None else '-'.join(
-            [str(i) for i in hidden_layers]),
+        model_type,
         '-'.join([str(i) for i in (train_batch, val_batch, test_batch,
                                    activ_func.__name__)]),
         dataset_flavor, get_timestamp())
@@ -222,16 +228,11 @@ if __name__ == '__main__':
 
     # set up dataset
 
-    if dataset_flavor == 'MNIST':
+    if dataset_flavor in AVAILABLE_FLAVORS:
         ((train_loader, val_loader, test_loader),
          (nb_train, nb_val, nb_test)) = get_MNIST_dataloaders(
             data_dir, train_batch, val_batch, test_batch, train_val_split,
-            use_cuda, 'MNIST', keep_shape=(hidden_layers is None))
-    elif dataset_flavor == 'FashionMNIST':
-        ((train_loader, val_loader, test_loader),
-         (nb_train, nb_val, nb_test)) = get_MNIST_dataloaders(
-            data_dir, train_batch, val_batch, test_batch, train_val_split,
-            use_cuda, 'FashionMNIST', keep_shape=(hidden_layers is None))
+            use_cuda, dataset_flavor, keep_shape=(model_type != 'dense'))
     else:
         raise Exception('Unknown dataset: {}'.format(dataset_flavor))
     print('dataset: {}, location: {}'.format(dataset_flavor, data_dir))
@@ -251,10 +252,7 @@ if __name__ == '__main__':
     if resume_from is None or not os.path.exists(resume_from):
         print('initializing model ...')
         # set up model
-        if hidden_layers is None:
-            ref_model = LocalMininet(activ_func)
-        else:
-            ref_model = MLP(hidden_layers, activ_func)
+        ref_model = globals()[model_type[0].upper()+model_type[1:]](activ_func)
         if use_cuda:
             ref_model.cuda()
         # set up optimizer

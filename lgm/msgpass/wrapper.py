@@ -37,7 +37,7 @@ from .common import common as cc
 
 
 INPUT_MODES_MAP = {'step': 'LayerModelWrapper'}
-METHODS = {'pro': ('loopy', 'seqloopy', 'trw', 'seqtrw')}
+METHODS = {'pro': ('loopy', 'trw', 'seqtrw')}
 
 
 def layerModelWrapper(model: Union[proto.LayerModel, impl.LayerModel],

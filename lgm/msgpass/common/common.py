@@ -44,9 +44,8 @@ from ...utils.common import (Picklable, SavableModel, full_class_name,
 
 
 NEIGHBOR_TYPE_MAP = {ConnectionType.DENSE: 'DenseNeighborWrapper',
+                     ConnectionType.CONV: 'ConvNeighborWrapper',
                      ConnectionType.LOCAL: 'LocalNeighborWrapper'}
-CONNECTION_TYPE_MAP = {ConnectionType.DENSE: 'DenseConnectionWrapper',
-                       ConnectionType.LOCAL: 'LocalConnectionWrapper'}
 
 
 class LayerWrapper(nn.Module):
@@ -347,6 +346,22 @@ class LocalNeighborWrapper(NeighborWrapper, metaclass=abc.ABCMeta):
                          ).view(sz[0], -1, sz[-1])
 
 
+class ConvNeighborWrapper(LocalNeighborWrapper, metaclass=abc.ABCMeta):
+    def _inputs_reshape(self, sbelief: Tensor, mask, neg_bin: Tensor,
+                        ) -> Tuple[Tensor, Any, Tensor]:
+        params = self.params
+        conv_dim = params.dim
+        cnl = getattr(params, ('rchannel', 'lchannel')[self.direct])
+        shp = getattr(params, ('rshape', 'lshape')[self.direct])
+        bsz, nlb = sbelief.size(0), sbelief.size(-1)
+        sbelief = sbelief.view(bsz, 1, cnl, *((1,) * conv_dim), *shp, 1, nlb)
+        neg_bin = neg_bin[(Ellipsis,) + (None,) * conv_dim +
+                          (slice(None), slice(None))]
+        if not isinstance(mask, bool):
+            mask = mask.view(bsz, 1, cnl, *((1,) * conv_dim), *shp, 1)
+        return sbelief, mask, neg_bin
+
+
 class LayerModelWrapper(nn.Module, SavableModel, metaclass=abc.ABCMeta):
     def __init__(self, model: LayerModel, frequency: int,
                  output_names: Iterable[str]=(), autoclear: bool=True
@@ -452,8 +467,6 @@ class LayerModelWrapper(nn.Module, SavableModel, metaclass=abc.ABCMeta):
         # load all belief values
         self._load_known_believes(inputs, masks)
         self._check_evidences()
-        for l in self.layers.children():
-            l.update_belief()
 
     def forward(self, inputs: Union[Tensor,
                                     Sequence[Optional[Tensor]]],
@@ -468,7 +481,9 @@ class LayerModelWrapper(nn.Module, SavableModel, metaclass=abc.ABCMeta):
         return_val = []
         layers = self.layers
         for n in self.output_names:
-            return_val.append(getattr(layers, n).get_logbelief())
+            lo = getattr(layers, n)
+            lo.update_belief()
+            return_val.append(lo.get_logbelief())
         # clear messages at the end if not needed, else save messages
         if self.autoclear:
             self.clear()

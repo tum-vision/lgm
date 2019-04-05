@@ -37,10 +37,9 @@ class LayerModelWrapper(common.LayerModelWrapper, metaclass=abc.ABCMeta):
     def _infer_step(self) -> None:
         msg_lists = []
         for l in self.layers.children():
+            l.update_belief()
             msg_lists.append([n.get_message_update()
                               for n in l.neighbors.children()])
         for l, msgs in zip(self.layers.children(), msg_lists):
             for n, m in zip(l.neighbors.children(), msgs):
                 n.set_message_update(m)
-        for l in self.layers.children():
-            l.update_belief()

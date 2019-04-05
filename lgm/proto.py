@@ -46,6 +46,7 @@ class LayerType(str, Enum):
 
 class ConnectionType(str, Enum):
     DENSE = 'dense'
+    CONV = 'conv'
     LOCAL = 'local'
 
 
@@ -76,6 +77,8 @@ class ConnectionParams(object):
               ) -> 'ConnectionParams':
         if method is ConnectionType.DENSE:
             return DenseParams(left_params, right_params)
+        if method is ConnectionType.CONV:
+            return ConvParams(left_params, right_params, *args, **kwargs)
         elif method is ConnectionType.LOCAL:
             return LocalParams(left_params, right_params, *args, **kwargs)
         else:
@@ -158,6 +161,20 @@ class LocalParams(ConnectionParams):
                     upper_offset < - double_bound or \
                     upper_offset > double_bound:
                 raise ValueError('Dangling nodes in dimension {0}'.format(i))
+
+
+class ConvParams(LocalParams):
+    def __init__(self,
+                 left_params: LayerParams,
+                 right_params: LayerParams,
+                 kernel_shape: Sequence[int],
+                 doubleoffset: Optional[Union[int, Sequence[int]]] = None,
+                 stride: Union[int, Sequence[int]] = 1,
+                 dilation: Union[int, Sequence[int]] = 1) -> None:
+        super(ConvParams, self).__init__(left_params, right_params,
+                                         kernel_shape, doubleoffset, stride,
+                                         dilation)
+        self.method = ConnectionType.CONV
 
 
 class VariableLayer(object):

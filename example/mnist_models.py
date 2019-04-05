@@ -39,26 +39,44 @@ NB_CLASS = 10
 def dense() -> proto.LayerModel:
     layer_graph = proto.LayerModel('dense')
     layer_graph.add_layer((1, 28, 28), 2, LayerType.CND, 'i')
-    layer_graph.add_layer(100, 2, LayerType.HID, 'h')
+    layer_graph.add_layer(10, 11, LayerType.HID, 'h')
     layer_graph.add_layer(1, NB_CLASS, LayerType.HID, 'o')
     layer_graph.connect_layers(['i', 'h'], ConnectionType.DENSE, 'ih')
     layer_graph.connect_layers(['h', 'o'], ConnectionType.DENSE, 'ho')
     return layer_graph
 
 
+def conv() -> proto.LayerModel:
+    layer_graph = proto.LayerModel('conv')
+    layer_graph.add_layer((1, 28, 28), 2, LayerType.CND, 'i')
+    layer_graph.add_layer((1, 13, 13), 7, LayerType.HID, 'c1')
+    layer_graph.add_layer((1, 5, 5), 17, LayerType.HID, 'c2')
+    layer_graph.add_layer(10, 11, LayerType.HID, 'd')
+    layer_graph.add_layer(1, NB_CLASS, LayerType.HID, 'o')
+    layer_graph.connect_layers(
+            ['i', 'c1'], ConnectionType.CONV, 'c1', kernel_shape=(5, 5),
+            stride=(2, 2), doubleoffset=(4, 4))
+    layer_graph.connect_layers(
+            ['c1', 'c2'], ConnectionType.CONV, 'c2', kernel_shape=(5, 5),
+            stride=(2, 2), doubleoffset=(4, 4))
+    layer_graph.connect_layers(['c2', 'd'], ConnectionType.DENSE, 'cd')
+    layer_graph.connect_layers(['d', 'o'], ConnectionType.DENSE, 'do')
+    return layer_graph
+
+
 def local() -> proto.LayerModel:
     layer_graph = proto.LayerModel('local_mininet')
     layer_graph.add_layer((1, 28, 28), 2, LayerType.CND, 'i')
-    layer_graph.add_layer((6, 13, 13), 2, LayerType.HID, 'l1')
-    layer_graph.add_layer((16, 5, 5), 2, LayerType.HID, 'l2')
-    layer_graph.add_layer(100, 2, LayerType.HID, 'd')
+    layer_graph.add_layer((1, 13, 13), 7, LayerType.HID, 'l1')
+    layer_graph.add_layer((1, 5, 5), 17, LayerType.HID, 'l2')
+    layer_graph.add_layer(10, 11, LayerType.HID, 'd')
     layer_graph.add_layer(1, NB_CLASS, LayerType.HID, 'o')
     layer_graph.connect_layers(
-            ['i', 'l1'], ConnectionType.LOCAL, 'l1', kernel_shape=(5, 5),
-            stride=(2, 2), doubleoffset=(4, 4))
+        ['i', 'l1'], ConnectionType.LOCAL, 'l1', kernel_shape=(5, 5),
+        stride=(2, 2), doubleoffset=(4, 4))
     layer_graph.connect_layers(
-            ['l1', 'l2'], ConnectionType.LOCAL, 'l2', kernel_shape=(5, 5),
-            stride=(2, 2), doubleoffset=(4, 4))
+        ['l1', 'l2'], ConnectionType.LOCAL, 'l2', kernel_shape=(5, 5),
+        stride=(2, 2), doubleoffset=(4, 4))
     layer_graph.connect_layers(['l2', 'd'], ConnectionType.DENSE, 'ld')
     layer_graph.connect_layers(['d', 'o'], ConnectionType.DENSE, 'do')
     return layer_graph

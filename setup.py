@@ -51,9 +51,21 @@ except ImportError:
 # check PyTorch version
 v = torch.version.__version__
 if not v >= '1.0.0':
-    raise RuntimeError('Expect PyTorch version 1.0.0+, found {}.'.format(v))
+    raise RuntimeError('Expect PyTorch version 1.0.0+, found {}'.format(v))
 else:
-    print('Found PyTorch {}.'.format(v))
+    print('Found PyTorch {}'.format(v))
+# attempt to import torchvision to check availability
+try:
+    import torchvision
+except ImportError:
+    raise RuntimeError('torchvision is not installed properly. Please go to '
+                       'pytorch.org and follow the installation guide.')
+# check torchvision version
+v = torchvision.__version__
+if not v >= '0.2.2':
+    raise RuntimeError('Expect torchvision version 0.2.2+, found {}'.format(v))
+else:
+    print('Found torchvision {}'.format(v))
 # install package
 setup(
     name="lgm",

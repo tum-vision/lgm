@@ -145,6 +145,34 @@ class DenseConnection(Connection):
         return energy.transpose(0, 1).transpose(2, 3)
 
 
+class ConvConnection(Connection):
+    """Implemntation for convolution connection"""
+
+    def __init__(self,
+                 connection: proto.Connection,
+                 left: VariableLayer,
+                 right: VariableLayer) -> None:
+        super().__init__(connection, left, right)
+        self._links = (get_local_links(self.params, False),
+                       get_local_links(self.params, True))
+
+    def links(self, direct: bool):
+        return self._links[direct]
+
+    def _initialize_binary_energy(self) -> nn.Parameter:
+        params = self.params
+        return nn.Parameter(torch.randn((params.lchannel, params.rchannel,
+                                         *params.kshape,
+                                         self.left.nb_label-1,
+                                         self.right.nb_label-1)),
+                            requires_grad=True)
+
+    def flip_energy(self, energy: torch.Tensor) -> torch.Tensor:
+        sz = energy.size()
+        return torch.flip(energy.view(*sz[0:2], -1, *sz[-2:]), [2]).view(
+                    sz).transpose(0, 1).transpose(-2, -1)
+
+
 class LocalConnection(Connection):
     """Implementation for local connection"""
     def __init__(self,
@@ -184,6 +212,8 @@ def connectionBuilder(connection: proto.Connection,
     method = connection.method
     if method is cnnttype.DENSE:
         return DenseConnection(connection, left, right)
+    elif method is cnnttype.CONV:
+        return ConvConnection(connection, left, right)
     elif method is cnnttype.LOCAL:
         return LocalConnection(connection, left, right)
     else:

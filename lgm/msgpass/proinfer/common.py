@@ -48,6 +48,11 @@ class DenseNeighborWrapper(cc.DenseNeighborWrapper, NeighborWrapper):
     pass
 
 
+class ConvNeighborWrapper(cc.ConvNeighborWrapper, NeighborWrapper):
+    """Implementation of neighbor with convolution connection"""
+    pass
+
+
 class LocalNeighborWrapper(cc.LocalNeighborWrapper, NeighborWrapper):
     """Implementation of neighbor with local connection"""
     pass

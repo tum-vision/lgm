@@ -27,7 +27,7 @@
 # along with LGM. If not, see <http://www.gnu.org/licenses/>.
 ###############################################################################
 """
-test script for learning with MNIST / FashionMNIST
+test script for learning with MNIST / KMNIST / FashionMNIST
 """
 import os
 import argparse
@@ -39,33 +39,32 @@ from lgm.utils.common import (get_timestamp, Log, check_cuda, mkdirp,
                               rm, training_backup, training_resume,
                               EarlyStopper, display_param_stats)
 from lgm.utils.train import (train_epoch, eval_epoch, test)
-from lgm.utils.data.mnist import get_MNIST_dataloaders
+from lgm.utils.data.mnist import get_MNIST_dataloaders, AVAILABLE_FLAVORS
 import mnist_models
 
 
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--model',
-                        choices=('dense', 'local'),
-                        default='local',
+                        choices=('dense', 'conv', 'local'),
+                        default='conv',
                         help='Specify the LGM model to run. Can be either '
-                             'dense or local. By default local.')
+                             'dense, conv or local. By default conv.')
     parser.add_argument('-i', '--infer',
-                        choices=('loopy', 'seqloopy', 'trw', 'seqtrw'),
-                        default='seqtrw',
+                        choices=('loopy', 'trw', 'seqtrw'),
+                        default='trw',
                         help='Specify the inference method. Can be either '
-                             'loopy, seqloopy, trw or seqtrw. By default '
-                             'seqtrw.')
+                             'loopy, trw or seqtrw. By default trw.')
     parser.add_argument('-n', '--nbiter',
                         type=int,
                         default=5,
                         help='Specify the number of inference iterations. By '
                              'default 5.')
     parser.add_argument('-d', '--dataset',
-                        choices=('MNIST', 'FashionMNIST'),
+                        choices=('MNIST', 'KMNIST', 'FashionMNIST'),
                         default='MNIST',
                         help='Specify the dataset to run. Can be either MNIST '
-                             'or FashionMNIST. By default MNIST.')
+                             ', KMNIST or FashionMNIST. By default MNIST.')
     parser.add_argument('-g', '--gpu',
                         action='store_const',
                         const=True,
@@ -112,6 +111,7 @@ if __name__ == '__main__':
     test_batch = args.batch
 
     data_dir = {'MNIST': 'data/MNIST/',
+                'KMNIST': 'data/KMNIST/',
                 'FashionMNIST': 'data/FashionMNIST/'}[dataset_flavor]
     base_dir = __file__[:-3] + '/'
     save_dir = base_dir + 'model/'
@@ -151,16 +151,11 @@ if __name__ == '__main__':
 
     # set up dataset
 
-    if dataset_flavor == 'MNIST':
+    if dataset_flavor in AVAILABLE_FLAVORS:
         ((train_loader, val_loader, test_loader),
          (nb_train, nb_val, nb_test)) = get_MNIST_dataloaders(
             data_dir, train_batch, val_batch, test_batch, train_val_split,
-            use_cuda, 'MNIST')
-    elif dataset_flavor == 'FashionMNIST':
-        ((train_loader, val_loader, test_loader),
-         (nb_train, nb_val, nb_test)) = get_MNIST_dataloaders(
-            data_dir, train_batch, val_batch, test_batch, train_val_split,
-            use_cuda, 'FashionMNIST')
+            use_cuda, dataset_flavor)
     else:
         raise Exception('Unknown dataset: {}'.format(dataset_flavor))
     print('dataset: {}, location: {}'.format(dataset_flavor, data_dir))

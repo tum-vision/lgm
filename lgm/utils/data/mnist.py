@@ -27,12 +27,15 @@
 # along with LGM. If not, see <http://www.gnu.org/licenses/>.
 ###############################################################################
 """
-MNIST / FashionMNIST related utilities
+MNIST / KMNIST / FashionMNIST related utilities
 """
 from typing import Tuple
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 from torchvision import datasets, transforms
+
+
+AVAILABLE_FLAVORS = ('MNIST', 'FashionMNIST', 'KMNIST')
 
 
 def get_MNIST_dataloaders(data_dir: str,
@@ -46,7 +49,7 @@ def get_MNIST_dataloaders(data_dir: str,
                           pin_memory: bool = True
                           ) -> Tuple[Tuple[DataLoader, DataLoader, DataLoader],
                                      Tuple[int, int, int]]:
-    assert flavor in ['MNIST', 'FashionMNIST']
+    assert flavor in AVAILABLE_FLAVORS
     dataset = datasets.__dict__[flavor]
     kwargs = {'num_workers': 1, 'pin_memory': pin_memory} if use_cuda else {}
     tf_totensor = \

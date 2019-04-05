@@ -29,12 +29,21 @@
 """
 sequential TRW method for probabilistic inference on layered graphical models
 """
+import torch.nn as nn
 from . import common
 from ..common import common as cc, sequential as s, trw as t
 
 
+class ConnectionWrapper(t.ConnectionWrapper, cc.ConnectionWrapper):
+    pass
+
+
 class DenseNeighborWrapper(t.DenseNeighborWrapper,
                            common.DenseNeighborWrapper):
+    pass
+
+
+class ConvNeighborWrapper(t.LocalNeighborWrapper, common.ConvNeighborWrapper):
     pass
 
 
@@ -51,6 +60,16 @@ def neighborWrapperBuilder(source: cc.LayerWrapper, target: cc.LayerWrapper,
 
 
 class LayerModelWrapper(s.LayerModelWrapper, common.LayerModelWrapper):
+    def wrap_connections(self) -> nn.Module:
+        cnntwrappers = nn.Module()
+        layerwrappers = self.layers
+        for cname, cnnt in self.model.connections.named_children():
+            cnntwrappers.add_module(
+                cname, ConnectionWrapper(
+                    cnnt, getattr(layerwrappers, cnnt.left.name),
+                    getattr(layerwrappers, cnnt.right.name)))
+        return cnntwrappers
+
     def wrap_neighbors(self) -> None:
         cc.wrapNeighbors(self.layers, self.connections,
                          self.layers2connection, neighborWrapperBuilder)
